@@ -3,11 +3,8 @@ package combat.model;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.UUID;
-import model.Unit;
 
-/**
- * 战斗单位核心类 - 完整版
- */
+
 public class CombatUnit {
     private final String id;
     private String name;
@@ -26,8 +23,9 @@ public class CombatUnit {
     private CombatStatus status;
     private boolean hasMovedThisTurn;
     private boolean hasActedThisTurn;
+    private CombatRange combatRange;
 
-    // 新增战斗属性
+    // 战斗属性
     private BigDecimal currentDefense;
     private final BigDecimal maxDefense;
     private BigDecimal damageMultiplier;
@@ -54,8 +52,9 @@ public class CombatUnit {
         this.status = CombatStatus.NORMAL;
         this.hasMovedThisTurn = false;
         this.hasActedThisTurn = false;
+        this.combatRange = new CombatRange(1, 1);
 
-        // 新增字段初始化
+        // 初始化战斗属性
         this.currentDefense = setPrecision(defense);
         this.maxDefense = setPrecision(defense);
         this.damageMultiplier = BigDecimal.ONE;
@@ -83,6 +82,26 @@ public class CombatUnit {
 
     private BigDecimal setPrecision(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 执行带反击的攻击
+     */
+    public RetaliationCombatCalculator.RetaliationResult attackWithRetaliation(CombatUnit target) {
+        RetaliationCombatCalculator.RetaliationResult result =
+                RetaliationCombatCalculator.calculateCombat(this, target);
+
+        if (result.isInRange()) {
+            // 应用攻击者的伤害
+            target.applyDamageResult(result.getAttackerDamage());
+
+            // 如果有反击，应用反击伤害
+            if (result.hasRetaliation()) {
+                this.applyDamageResult(result.getRetaliationDamage());
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -121,14 +140,6 @@ public class CombatUnit {
         boolean defenseBreached = this.currentDefense.compareTo(BigDecimal.ZERO) == 0;
 
         return new DamageResult(combatResult, defenseDamage, healthDamage, killed, defenseBreached);
-    }
-
-    /**
-     * 攻击其他单位
-     */
-    public AttackResult attackTarget(CombatUnit target) {
-        DamageResult damageResult = target.takeDamage(this);
-        return new AttackResult(this, target, damageResult);
     }
 
     /**
@@ -201,7 +212,8 @@ public class CombatUnit {
             return BigDecimal.ZERO;
         }
         return setPrecision(
-                this.currentHealth.divide(this.maxHealth, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+                this.currentHealth.divide(this.maxHealth, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
         );
     }
 
@@ -260,6 +272,8 @@ public class CombatUnit {
     public void setHasMovedThisTurn(boolean hasMovedThisTurn) { this.hasMovedThisTurn = hasMovedThisTurn; }
     public boolean hasActedThisTurn() { return hasActedThisTurn; }
     public void setHasActedThisTurn(boolean hasActedThisTurn) { this.hasActedThisTurn = hasActedThisTurn; }
+    public CombatRange getCombatRange() { return combatRange; }
+    public void setCombatRange(CombatRange combatRange) { this.combatRange = combatRange; }
 
     // 新增Getter和Setter方法
     public BigDecimal getCurrentDefense() { return currentDefense; }
